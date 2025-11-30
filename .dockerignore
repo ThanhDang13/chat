@@ -1,0 +1,27 @@
+# Ignore linting and config files
+
+**/eslint.config.js
+**/eslint.config.mjs
+\*\*/.eslintrc\*
+\*\*/.eslintignore
+
+# Ignore dev and editor files
+
+**/.vscode
+**/\*.md
+
+# Ignore local caches
+
+node_modules
+\*\*/node_modules
+.nx
+.tanstack
+.verdaccio
+.pnpm-store
+tmp
+pnpm-debug.log
+
+# Ignore tests (optional)
+
+**/_.test._
+**/_.spec._

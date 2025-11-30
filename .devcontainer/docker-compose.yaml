@@ -1,0 +1,112 @@
+version: "3.8"
+
+services:
+  devcontainer:
+    image: mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ../../chat:/workspace/chat:cached
+      - /workspace/chat/apps/api/node_modules
+      - /workspace/chat/apps/web/node_modules
+      - /workspace/chat/packages/shared/node_modules
+      - /workspace/chat/node_modules
+      - pnpm-store:/workspace/chat/.pnpm_store
+    expose:
+      - "3000"
+      - "4200"
+      - "4983"
+    depends_on:
+      - postgres
+      - minio
+      - livekit
+      - redis
+    command: sleep infinity
+    networks:
+      - devnet
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - devnet
+
+  redis:
+    image: redis/redis-stack:latest
+    restart: unless-stopped
+    # expose:
+    #   - "6379"
+    ports:
+      - "8001:8001"
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - devnet
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    # expose:
+    #   - "9000" # API
+    ports:
+      - "9001:9001" # Console UI
+      - "9000:9000" # API
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    networks:
+      - devnet
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: >
+      --dev
+      --bind 0.0.0.0
+      --port 7880
+      --udp-port 7882
+    environment:
+      # optional if you prefer env vars instead of --keys
+      LIVEKIT_KEYS: "devkey: secret"
+    ports:
+      - "7880:7880" # HTTP / WebSocket signaling
+      - "7882:7882/udp" # WebRTC media traffic
+    networks:
+      - devnet
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - postgres
+      - devcontainer
+      - minio
+      # - redis
+    networks:
+      - devnet
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  pnpm-store:
+  postgres-data:
+  minio-data:
+  redis-data:
+
+networks:
+  devnet:

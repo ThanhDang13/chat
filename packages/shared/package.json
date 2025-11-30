@@ -1,0 +1,31 @@
+{
+  "name": "shared",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "nx": {
+    "sourceRoot": "packages/shared/src",
+    "projectType": "library",
+    "targets": {
+      "build": {
+        "executor": "@nx/js:tsc",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "options": {
+          "outputPath": "dist/packages/shared",
+          "main": "packages/shared/src/index.ts",
+          "tsConfig": "packages/shared/tsconfig.lib.json",
+          "assets": [
+            "packages/shared/*.md"
+          ]
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "tslib": "^2.3.0"
+  }
+}
