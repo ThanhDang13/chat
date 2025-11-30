@@ -1,0 +1,45 @@
+{
+  "name": "desktop",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "src/main.ts",
+  "nx": {
+    "targets": {
+      "start": {
+        "executor": "nx:run-commands",
+        "options": {
+          "commands": [
+            "nx run web:serve --host 0.0.0.0",
+            "wait-on http://localhost:4200 && electron-forge start"
+          ],
+          "parallel": true,
+          "cwd": "apps/desktop"
+        }
+      },
+      "make": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "electron-forge make --platform win32",
+          "cwd": "apps/desktop"
+        }
+      },
+      "package": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "electron-forge package --platform win32",
+          "cwd": "apps/desktop"
+        }
+      }
+    }
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^7.10.2",
+    "@electron-forge/maker-deb": "^7.10.2",
+    "@electron-forge/maker-rpm": "^7.10.2",
+    "@electron-forge/maker-squirrel": "^7.10.2",
+    "@electron-forge/maker-zip": "^7.10.2",
+    "electron": "^39.1.0",
+    "wait-on": "^9.0.1"
+  }
+}

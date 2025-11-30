@@ -33,7 +33,7 @@ export default fp(
 
       // --- Response serialization errors (Fastify+Zod type provider) ---
       if (isResponseSerializationError(error)) {
-        request.log.error(`Response serialization error`, error);
+        request.log.error({ err: error }, "Response serialization error");
         return reply.status(500).send({
           error: "ResponseSerializationError",
           message: "Response doesn't match the schema",
@@ -55,7 +55,7 @@ export default fp(
 
       // --- Generic unhandled errors ---
       if (error instanceof Error) {
-        request.log.error(`Unhandled error: ${error.message}`, error, error.stack);
+        request.log.error({ err: error }, `Unhandled error: ${error.message}`);
         return reply.status(500).send({
           error: "InternalServerError",
           message: "Something went wrong"
