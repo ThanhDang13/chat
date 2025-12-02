@@ -30,7 +30,7 @@ function ChatLayoutRoute() {
     <div className="flex h-screen w-full">
       <SidebarProvider>
         <ChatSidebar />
-        <SidebarInset className="m-0 ml-0 rounded-none shadow-none md:m-0 md:ml-0">
+        <SidebarInset className="!m-1 !p-0 ml-0 rounded-none shadow-none">
           <div className="flex h-full flex-1 flex-col">
             <Outlet />
           </div>

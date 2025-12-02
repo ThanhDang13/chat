@@ -14,7 +14,7 @@ export const Route = createRootRoute({
             <Toaster />
           </main>
         </ThemeProvider>
-        <TanStackRouterDevtools />
+        {/* <TanStackRouterDevtools /> */}
       </>
     );
   }

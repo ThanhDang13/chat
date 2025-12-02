@@ -4,7 +4,8 @@ import {
   SidebarSeparator,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupContent
+  SidebarGroupContent,
+  SidebarFooter
 } from "@web/components/ui/sidebar";
 import { CreateGroupDialog } from "@web/components/chat/sidebar/create-group-dialog";
 import { ConversationList } from "@web/components/chat/sidebar/conversation-list";
@@ -31,10 +32,10 @@ export const ChatSidebarContent = () => {
 
       <SidebarSeparator />
 
-      <SidebarContent>
+      <SidebarContent className="py-0">
         <SidebarGroup>
           <SidebarGroupContent>
-            <div className="h-[80dvh] overflow-y-auto">
+            <div className="h-[85vh] overflow-y-auto">
               {query.length > 0 ? <SearchUserList keyword={query} /> : <ConversationList />}
             </div>
           </SidebarGroupContent>

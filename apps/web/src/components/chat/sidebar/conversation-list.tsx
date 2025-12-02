@@ -74,7 +74,7 @@ export const ConversationList = React.memo(({ standalone = false }: { standalone
   }
 
   return (
-    <ScrollArea ref={scrollAreaRef} className="no-scrollbar h-full gap-1 overflow-y-auto p-2">
+    <ScrollArea ref={scrollAreaRef} className="h-full gap-1 overflow-y-auto p-2 pb-0">
       <div className="relative" style={{ height: `${virtualizer.getTotalSize()}px` }}>
         {virtualItems.map((vItem) => {
           const conversation = sortedConversations[vItem.index];
