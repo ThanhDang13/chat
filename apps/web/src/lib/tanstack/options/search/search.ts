@@ -1,6 +1,7 @@
 import { InfiniteData, UseInfiniteQueryOptions } from "@tanstack/react-query";
 import axiosInstance from "@web/lib/axios/instance";
 import { GetUsersByfilterResponseDTO } from "@api/modules/user/application/queries/get-users-by-filter/get-users-by-filter.dto";
+import { sleep } from "@web/lib/utils";
 
 export type UsersPage = GetUsersByfilterResponseDTO["payload"];
 

@@ -10,25 +10,31 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as CallRouteImport } from './routes/call'
-import { Route as CRouteImport } from './routes/_c'
-import { Route as CIndexRouteImport } from './routes/_c/index'
+import { Route as HomeRouteImport } from './routes/_home'
+import { Route as HomeProfileRouteImport } from './routes/_home/profile'
+import { Route as HomeCRouteImport } from './routes/_home/_c'
 import { Route as AuthSignupRouteImport } from './routes/_auth/signup'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
-import { Route as CChatIdRouteImport } from './routes/_c/chat.$id'
+import { Route as HomeCIndexRouteImport } from './routes/_home/_c/index'
+import { Route as HomeCChatIdRouteImport } from './routes/_home/_c/chat.$id'
 
 const CallRoute = CallRouteImport.update({
   id: '/call',
   path: '/call',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CRoute = CRouteImport.update({
-  id: '/_c',
+const HomeRoute = HomeRouteImport.update({
+  id: '/_home',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CIndexRoute = CIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => CRoute,
+const HomeProfileRoute = HomeProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => HomeRoute,
+} as any)
+const HomeCRoute = HomeCRouteImport.update({
+  id: '/_c',
+  getParentRoute: () => HomeRoute,
 } as any)
 const AuthSignupRoute = AuthSignupRouteImport.update({
   id: '/_auth/signup',
@@ -40,52 +46,63 @@ const AuthLoginRoute = AuthLoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CChatIdRoute = CChatIdRouteImport.update({
+const HomeCIndexRoute = HomeCIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => HomeCRoute,
+} as any)
+const HomeCChatIdRoute = HomeCChatIdRouteImport.update({
   id: '/chat/$id',
   path: '/chat/$id',
-  getParentRoute: () => CRoute,
+  getParentRoute: () => HomeCRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/call': typeof CallRoute
   '/login': typeof AuthLoginRoute
   '/signup': typeof AuthSignupRoute
-  '/': typeof CIndexRoute
-  '/chat/$id': typeof CChatIdRoute
+  '/profile': typeof HomeProfileRoute
+  '/': typeof HomeCIndexRoute
+  '/chat/$id': typeof HomeCChatIdRoute
 }
 export interface FileRoutesByTo {
   '/call': typeof CallRoute
   '/login': typeof AuthLoginRoute
   '/signup': typeof AuthSignupRoute
-  '/': typeof CIndexRoute
-  '/chat/$id': typeof CChatIdRoute
+  '/profile': typeof HomeProfileRoute
+  '/': typeof HomeCIndexRoute
+  '/chat/$id': typeof HomeCChatIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_c': typeof CRouteWithChildren
+  '/_home': typeof HomeRouteWithChildren
   '/call': typeof CallRoute
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/signup': typeof AuthSignupRoute
-  '/_c/': typeof CIndexRoute
-  '/_c/chat/$id': typeof CChatIdRoute
+  '/_home/_c': typeof HomeCRouteWithChildren
+  '/_home/profile': typeof HomeProfileRoute
+  '/_home/_c/': typeof HomeCIndexRoute
+  '/_home/_c/chat/$id': typeof HomeCChatIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/call' | '/login' | '/signup' | '/' | '/chat/$id'
+  fullPaths: '/call' | '/login' | '/signup' | '/profile' | '/' | '/chat/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/call' | '/login' | '/signup' | '/' | '/chat/$id'
+  to: '/call' | '/login' | '/signup' | '/profile' | '/' | '/chat/$id'
   id:
     | '__root__'
-    | '/_c'
+    | '/_home'
     | '/call'
     | '/_auth/login'
     | '/_auth/signup'
-    | '/_c/'
-    | '/_c/chat/$id'
+    | '/_home/_c'
+    | '/_home/profile'
+    | '/_home/_c/'
+    | '/_home/_c/chat/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  CRoute: typeof CRouteWithChildren
+  HomeRoute: typeof HomeRouteWithChildren
   CallRoute: typeof CallRoute
   AuthLoginRoute: typeof AuthLoginRoute
   AuthSignupRoute: typeof AuthSignupRoute
@@ -100,19 +117,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CallRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_c': {
-      id: '/_c'
+    '/_home': {
+      id: '/_home'
       path: ''
       fullPath: ''
-      preLoaderRoute: typeof CRouteImport
+      preLoaderRoute: typeof HomeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_c/': {
-      id: '/_c/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof CIndexRouteImport
-      parentRoute: typeof CRoute
+    '/_home/profile': {
+      id: '/_home/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof HomeProfileRouteImport
+      parentRoute: typeof HomeRoute
+    }
+    '/_home/_c': {
+      id: '/_home/_c'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof HomeCRouteImport
+      parentRoute: typeof HomeRoute
     }
     '/_auth/signup': {
       id: '/_auth/signup'
@@ -128,30 +152,49 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_c/chat/$id': {
-      id: '/_c/chat/$id'
+    '/_home/_c/': {
+      id: '/_home/_c/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof HomeCIndexRouteImport
+      parentRoute: typeof HomeCRoute
+    }
+    '/_home/_c/chat/$id': {
+      id: '/_home/_c/chat/$id'
       path: '/chat/$id'
       fullPath: '/chat/$id'
-      preLoaderRoute: typeof CChatIdRouteImport
-      parentRoute: typeof CRoute
+      preLoaderRoute: typeof HomeCChatIdRouteImport
+      parentRoute: typeof HomeCRoute
     }
   }
 }
 
-interface CRouteChildren {
-  CIndexRoute: typeof CIndexRoute
-  CChatIdRoute: typeof CChatIdRoute
+interface HomeCRouteChildren {
+  HomeCIndexRoute: typeof HomeCIndexRoute
+  HomeCChatIdRoute: typeof HomeCChatIdRoute
 }
 
-const CRouteChildren: CRouteChildren = {
-  CIndexRoute: CIndexRoute,
-  CChatIdRoute: CChatIdRoute,
+const HomeCRouteChildren: HomeCRouteChildren = {
+  HomeCIndexRoute: HomeCIndexRoute,
+  HomeCChatIdRoute: HomeCChatIdRoute,
 }
 
-const CRouteWithChildren = CRoute._addFileChildren(CRouteChildren)
+const HomeCRouteWithChildren = HomeCRoute._addFileChildren(HomeCRouteChildren)
+
+interface HomeRouteChildren {
+  HomeCRoute: typeof HomeCRouteWithChildren
+  HomeProfileRoute: typeof HomeProfileRoute
+}
+
+const HomeRouteChildren: HomeRouteChildren = {
+  HomeCRoute: HomeCRouteWithChildren,
+  HomeProfileRoute: HomeProfileRoute,
+}
+
+const HomeRouteWithChildren = HomeRoute._addFileChildren(HomeRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  CRoute: CRouteWithChildren,
+  HomeRoute: HomeRouteWithChildren,
   CallRoute: CallRoute,
   AuthLoginRoute: AuthLoginRoute,
   AuthSignupRoute: AuthSignupRoute,

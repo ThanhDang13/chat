@@ -7,6 +7,8 @@ import type { GetPrivateConversationQueryHandler } from "@api/modules/conversati
 
 import type { CreateConversationCommandHandler } from "@api/modules/conversation/application/commands/create-conversation/create-conversation.handler";
 import type { GetConversationByIdQueryHandler } from "@api/modules/conversation/application/queries/get-conversation-by-id/get-conversation-by-id.handler";
+import type { UpdateConversationMuteStatusCommandHandler } from "@api/modules/conversation/application/commands/update-conversation-mute-status/update-conversation-mute-status.handler";
+import type { ConversationCreatedEventHandler } from "@api/modules/conversation/application/event-handlers/conversation-created.handler";
 
 declare module "@fastify/awilix" {
   interface Cradle {
@@ -17,11 +19,13 @@ declare module "@fastify/awilix" {
   }
   interface Cradle {
     createConversationCommandHandler: CreateConversationCommandHandler;
+    updateConversationMuteStatusCommandHandler: UpdateConversationMuteStatusCommandHandler;
   }
   interface Cradle {
     userConnectedEventHandler: UserConnectedEventHandler;
     userDisconnectedEventHandler: UserDisconnectedEventHandler;
     conversationReadUpdateEventHandler: ConversationReadUpdateEventHandler;
+    conversationCreatedEventHandler: ConversationCreatedEventHandler;
   }
 }
 

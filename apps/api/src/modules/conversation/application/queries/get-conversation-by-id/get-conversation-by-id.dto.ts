@@ -1,5 +1,5 @@
 import { apiResponse } from "@api/shared/types/common";
-import z from "zod";
+import z, { string } from "zod";
 
 export const conversationDTOSchema = z.object({
   id: z.string(),
@@ -9,9 +9,12 @@ export const conversationDTOSchema = z.object({
   participants: z.array(
     z.object({
       userId: z.string(),
-      status: z.enum(["online", "offline"])
+      status: z.enum(["online", "offline"]),
+      username: z.string()
     })
   ),
+  bio: z.string().nullable(),
+  isMuted: z.boolean().default(false),
   lastMessage: z
     .object({
       id: z.string(),

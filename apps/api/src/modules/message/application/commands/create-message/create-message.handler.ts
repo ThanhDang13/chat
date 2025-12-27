@@ -5,10 +5,12 @@ import { DataBase } from "@api/infra/database";
 import { CommandHandler } from "@api/shared/commands/command-handler";
 import { CreateMessageCommand } from "@api/modules/message/application/commands/create-message/create-message.command";
 import type { CallbackMessage } from "@api/modules/message/application/commands/create-message/create-message.dto";
+import { v7 as uuidv7 } from "uuid";
 
-export class CreateMessageCommandHandler
-  implements CommandHandler<CreateMessageCommand, CallbackMessage>
-{
+export class CreateMessageCommandHandler implements CommandHandler<
+  CreateMessageCommand,
+  CallbackMessage
+> {
   private readonly eventBus: RedisEventBus;
   private readonly db: DataBase;
   constructor({
@@ -28,6 +30,7 @@ export class CreateMessageCommandHandler
     const [message] = await this.db
       .insert(messages)
       .values({
+        id: uuidv7(),
         conversationId: conversationId,
         senderId: senderId,
         content: content,
@@ -37,9 +40,7 @@ export class CreateMessageCommandHandler
       .returning();
 
     const event = new MessageCreatedEvent({
-      message: {
-        ...message
-      }
+      message
     });
 
     await this.eventBus.publish(event);

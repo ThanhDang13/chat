@@ -40,5 +40,29 @@ export const cursorPaginatedSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
 
 export type CursorPaginated<E> = z.infer<ReturnType<typeof cursorPaginatedSchema<z.ZodType<E>>>>;
 
-export type PagingDTO = OffsetPagingDTO | CursorPagingDTO;
+export const bidirectionalCursorPagingDTOSchema = z.object({
+  type: z.literal("cursor"),
+  limit: z.coerce.number().optional().default(20),
+  after: z.uuidv7().optional(),
+  before: z.uuidv7().optional()
+});
+
+export type BidirectionalCursorPagingDTO = z.infer<typeof bidirectionalCursorPagingDTOSchema>;
+
+export const bidirectionalCursorPaginatedSchema = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.object({
+    type: z.literal("cursor"),
+    data: z.array(itemSchema),
+    hasNextPage: z.boolean().default(false),
+    hasPrevPage: z.boolean().default(false),
+    paging: bidirectionalCursorPagingDTOSchema,
+    nextCursor: z.uuidv7().optional(),
+    prevCursor: z.uuidv7().optional()
+  });
+
+export type BidirectionalCursorPaginated<E> = z.infer<
+  ReturnType<typeof bidirectionalCursorPaginatedSchema<z.ZodType<E>>>
+>;
+
+export type PagingDTO = OffsetPagingDTO | CursorPagingDTO | BidirectionalCursorPagingDTO;
 export type Paginated<E> = OffsetPaginated<E> | CursorPaginated<E>;

@@ -7,7 +7,8 @@ import {
   uuid,
   timestamp,
   pgEnum,
-  boolean
+  boolean,
+  index
 } from "drizzle-orm/pg-core";
 
 export const userRoles = pgEnum("user_roles", ["admin", "user"]);
@@ -27,9 +28,17 @@ export const users = pgTable("users", {
   fullname: text("full_name").notNull(),
   password: text("password").notNull(),
   avatar: text("avatar").default(""),
-  thumbnail: text("thumbnail").default(""),
+  bio: text("bio").default("").notNull(),
   createdAt: timestamp({ mode: "date" }).defaultNow(),
   updatedAt: timestamp({ mode: "date" }).defaultNow()
+});
+
+export const userPreferences = pgTable("user_preferences", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id),
+  mutedAll: boolean("muted_all").default(false),
+  theme: text("theme").default("system")
 });
 
 export const conversations = pgTable("conversations", {
@@ -53,22 +62,25 @@ export const conversationParticipants = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").default("member"),
     joinedAt: timestamp({ mode: "date" }).defaultNow(),
+    muted: boolean("muted").default(false).notNull(),
     lastReadMessageId: uuid("last_read_message_id")
   },
-  (table) => ({
-    pk: unique("conversation_participants_pk").on(table.conversationId, table.userId)
-  })
+  (table) => [unique("conversation_participants_pk").on(table.conversationId, table.userId)]
 );
 
-export const messages = pgTable("messages", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  conversationId: uuid("conversation_id")
-    .notNull()
-    .references(() => conversations.id, { onDelete: "cascade" }),
-  senderId: uuid("sender_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  content: text("content"),
-  type: messageTypes("type").notNull().default("text"),
-  timestamp: timestamp("timestamp", { mode: "date" }).defaultNow()
-});
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    senderId: uuid("sender_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    content: text("content"),
+    type: messageTypes("type").notNull().default("text"),
+    timestamp: timestamp("timestamp", { mode: "date" }).defaultNow()
+  },
+  (table) => [index("idx_id").on(table.id)]
+);

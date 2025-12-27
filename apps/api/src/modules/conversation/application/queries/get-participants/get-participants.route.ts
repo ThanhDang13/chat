@@ -15,7 +15,7 @@ export default fp(async function (fastify: FastifyInstance, opts: ModuleOptions)
     {
       preHandler: [fastify.auth.authenticate],
       schema: {
-        summary: "Get All Other Participants of Conversation with ID",
+        summary: "Get All Participants of Conversation with ID",
         security: [{ bearer: [] }],
         tags: [opts.apiTag],
         params: z.object({ conversationId: z.uuid() }),

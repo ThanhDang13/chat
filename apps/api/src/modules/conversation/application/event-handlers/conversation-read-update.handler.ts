@@ -6,9 +6,7 @@ import { and, eq } from "drizzle-orm";
 
 import type { Server as SocketIOServer } from "socket.io";
 
-export class ConversationReadUpdateEventHandler
-  implements IEventHandler<ConversationReadUpdateEvent>
-{
+export class ConversationReadUpdateEventHandler implements IEventHandler<ConversationReadUpdateEvent> {
   private readonly io: SocketIOServer;
   private readonly db: DataBase;
 
@@ -29,12 +27,10 @@ export class ConversationReadUpdateEventHandler
           )
         );
 
-      this.io
-        .to(event.payload.conversationId)
-        .emit("conversation:read:update", {
-          userId: event.payload.userId,
-          lastReadMessageId: event.payload.lastReadMessageId
-        });
+      this.io.to(event.payload.conversationId).emit("conversation:read:update", {
+        userId: event.payload.userId,
+        lastReadMessageId: event.payload.lastReadMessageId
+      });
     } catch (err) {
       console.error("Error updating last read message", err);
     }

@@ -22,4 +22,8 @@ export function updateConversation(
 
     return { ...old, pages: newPages };
   });
+  queryClient.setQueryData<ConversationDTO>(["conversation", conversationId], (old) => {
+    if (!old) return old;
+    return updater(old);
+  });
 }

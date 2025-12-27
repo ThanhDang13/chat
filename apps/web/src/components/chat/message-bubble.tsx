@@ -1,10 +1,16 @@
 import React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { Avatar, AvatarFallback, AvatarImage } from "@web/components/ui/avatar";
-import { cn } from "@web/lib/utils";
+import { cn, replaceHost } from "@web/lib/utils";
 import type { Message, PendingMessage } from "@api/modules/message/domain/message.domain";
 import { type ParticipantDTO } from "@api/modules/conversation/application/queries/get-participants/get-participants.dto";
 import { formatMessageTime } from "@web/lib/message";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@web/components/ui/tooltip";
+import { ImageZoom } from "@web/components/ui/image-zoom";
+import { AvatarGroup, AvatarGroupTooltip } from "@web/components/ui/avatar-group";
+import { useAuthStore } from "@web/stores/auth-store";
+import env from "@web/lib/env";
+import { AvatarWithStatus } from "@web/components/avatar-with-status";
 
 // Utility type guard for pending messages
 const isPendingMessage = (message: Message | PendingMessage): message is PendingMessage =>
@@ -20,7 +26,7 @@ export const messageBubbleVariants = cva(
       },
       type: {
         text: "px-4 py-3 border border-border",
-        image: "p-1 overflow-hidden",
+        image: "overflow-hidden",
         icon: "p-4 text-4xl border-none bg-transparent shadow-none" // big and clean
       }
     },
@@ -86,14 +92,13 @@ export const MessageBubble = React.memo(
     isLastInGroup,
     participants
   }: MessageBubbleProps) => {
-    // find sender from participants
     const sender = participants?.find((p) => p.userId === message.senderId);
-    // const { me } = useAuthStore();
+    const { me } = useAuthStore();
 
     const readByParticipants =
       !isPendingMessage(message) && participants
         ? participants
-            // .filter((p) => p.userId !== me?.id)
+            .filter((p) => p.userId !== me?.id)
             .filter((p) => p.lastReadMessageId === message.id)
         : [];
 
@@ -106,17 +111,25 @@ export const MessageBubble = React.memo(
           className={cn("group flex items-end gap-3 pb-1", isFromCurrentUser && "flex-row-reverse")}
         >
           {showAvatar && sender && (
-            <Avatar
-              className={cn(
-                "ring-background size-8 shadow-sm ring-2",
-                isLastInGroup ? "" : "invisible"
-              )}
-            >
-              <AvatarImage src={sender.avatar ?? undefined} alt={sender.fullname} />
-              <AvatarFallback className="text-primary-foreground bg-gradient-to-br from-blue-500 to-purple-600 text-sm font-semibold">
-                {sender.fullname.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <AvatarWithStatus
+                  name={sender.fullname ?? "Unknown"}
+                  avatar={sender.avatar}
+                  isOnline={false}
+                  size={40}
+                  className={cn(
+                    "ring-background size-8 shadow-sm ring-2",
+                    isLastInGroup ? "" : "invisible"
+                  )}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="rounded-md px-2 py-1 shadow-md">
+                <p className="text-muted-foreground text-opacity-70 text-xs font-medium">
+                  {sender.fullname}
+                </p>
+              </TooltipContent>
+            </Tooltip>
           )}
 
           <div
@@ -135,32 +148,48 @@ export const MessageBubble = React.memo(
               </p>
             )}
 
-            <div
-              className={cn(
-                messageBubbleVariants({
-                  isFromCurrentUser,
-                  type: message.type
-                }),
-                "inline-flex w-fit flex-col"
-              )}
-            >
-              {message.type === "text" && (
-                <span className={cn("text-sm leading-relaxed")}>{message.content}</span>
-              )}
-              {message.type === "image" && (
-                <img
-                  src={message.content ?? "/placeholder.svg"}
-                  alt="Sent"
-                  className="rounded-lg"
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    messageBubbleVariants({
+                      isFromCurrentUser,
+                      type: message.type
+                    }),
+                    "inline-flex w-fit flex-col"
+                  )}
+                >
+                  {message.type === "text" && (
+                    <span className={cn("text-sm leading-relaxed")}>{message.content}</span>
+                  )}
+                  {message.type === "image" && (
+                    <ImageZoom>
+                      <img
+                        src={
+                          replaceHost(message.content, env.VITE_REPLACE_S3_HOST) ??
+                          "/placeholder.svg"
+                        }
+                        alt="Sent"
+                        className="rounded-lg"
+                      />
+                    </ImageZoom>
+                  )}
+                  {message.type === "icon" && <span className="text-xl">{message.content}</span>}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <MessageTimestamp
+                  isFromCurrentUser={!!isFromCurrentUser}
+                  timestamp={message.timestamp}
                 />
-              )}
-              {message.type === "icon" && <span className="text-xl">{message.content}</span>}
-            </div>
+              </TooltipContent>
+            </Tooltip>
+
             <span className={cn("flex flex-row gap-2 px-2")}>
-              <MessageTimestamp
+              {/* <MessageTimestamp
                 isFromCurrentUser={!!isFromCurrentUser}
                 timestamp={message.timestamp}
-              />
+              /> */}
               {isPendingMessage(message) && (
                 <MessageStatus isFromCurrentUser={!!isFromCurrentUser} status={message.status} />
               )}
@@ -168,16 +197,28 @@ export const MessageBubble = React.memo(
           </div>
         </div>
         {readByParticipants?.length > 0 && (
-          <div className="mt-1 flex justify-end -space-x-2">
-            {readByParticipants.map((p) => (
-              <Avatar key={p.userId} className="ring-background size-4 ring-1">
-                <AvatarImage src={p.avatar ?? undefined} alt={p.fullname} />
-                <AvatarFallback className="bg-gray-300 text-xs font-semibold">
-                  {p.fullname.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+          <AvatarGroup variant="motion" className="mt-1 flex justify-end -space-x-2">
+            {readByParticipants.map((p, index) => (
+              // <Avatar key={p.userId} className="ring-background size-4 border ring-1">
+              //   <AvatarImage src={p.avatar ?? undefined} alt={p.fullname} />
+              //   <AvatarFallback className="bg-muted text-[10px] font-semibold">
+              //     {p.fullname?.charAt(0)?.toUpperCase()}
+              //   </AvatarFallback>
+              //   <AvatarGroupTooltip>
+              //     <p className="text-muted-foreground text-xs font-medium">{p.fullname}</p>
+              //   </AvatarGroupTooltip>
+              // </Avatar>
+              <AvatarWithStatus
+                key={index}
+                name={p.fullname ?? "Unknown"}
+                avatar={p.avatar}
+                isOnline={false}
+                size={18}
+                inGroup={true}
+                showToolTip={true}
+              />
             ))}
-          </div>
+          </AvatarGroup>
         )}
       </div>
     );

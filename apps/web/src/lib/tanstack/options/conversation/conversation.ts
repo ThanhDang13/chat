@@ -1,8 +1,14 @@
-import { InfiniteData, UseInfiniteQueryOptions, UseMutationOptions } from "@tanstack/react-query";
+import {
+  InfiniteData,
+  UseInfiniteQueryOptions,
+  UseMutationOptions,
+  UseQueryOptions
+} from "@tanstack/react-query";
 import axiosInstance from "@web/lib/axios/instance";
 import { type CursorPagingDTO } from "@api/shared/types/pagination";
 import { type GetConversationsResponseDTO } from "@api/modules/conversation/application/queries/get-conversations/get-conversations.dto";
 import { type OpenPrivateConversationResponseDTO } from "@api/modules/conversation/application/commands/open-private-conversation/open-private-conversation.dto";
+import type { GetConversationByIdResponseDTO } from "@api/modules/conversation/application/queries/get-conversation-by-id/get-conversation-by-id.dto";
 
 export type ConversationsPage = GetConversationsResponseDTO["payload"];
 
@@ -45,16 +51,36 @@ const openPrivateConversation = async (userId: string) => {
   return res.data.payload;
 };
 
-export const createOpenPrivateConversationMutationOptions = (
-  userId: string | null
-): UseMutationOptions<
+export const createOpenPrivateConversationMutationOptions = (): UseMutationOptions<
   OpenPrivateConversationResponseDTO["payload"],
   Error,
   string,
   OpenPrivateConversationResponseDTO["payload"]
 > => {
   return {
-    mutationKey: ["open, conversation", userId],
+    mutationKey: ["open, conversation"],
     mutationFn: (userId) => openPrivateConversation(userId)
   };
 };
+
+export const getConversationById = async (conversationId: string) => {
+  const response = await axiosInstance.get<GetConversationByIdResponseDTO>(
+    `/conversations/${conversationId}`
+  );
+  return response.data.payload;
+};
+
+export const createGetConversationByIdQueryOptions = ({
+  conversationId
+}: {
+  conversationId: string;
+}): UseQueryOptions<
+  GetConversationByIdResponseDTO["payload"],
+  Error,
+  GetConversationByIdResponseDTO["payload"],
+  unknown[]
+> => ({
+  queryKey: ["conversation", conversationId],
+  queryFn: () => getConversationById(conversationId),
+  staleTime: Infinity
+});

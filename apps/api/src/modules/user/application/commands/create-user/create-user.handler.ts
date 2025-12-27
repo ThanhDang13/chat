@@ -1,8 +1,9 @@
 import { CommandHandler } from "@api/shared/commands/command-handler";
 import { DataBase } from "@api/infra/database";
-import { users } from "@api/infra/database/schema";
+import { userPreferences, users } from "@api/infra/database/schema";
 import { CreateUserCommand } from "@api/modules/user/application/commands/create-user/create-user.command";
 import { EmailAlreadyExistsError } from "@api/modules/user/domain/user.errors";
+import * as argon2 from "argon2";
 
 export class CreateUserCommandHandler implements CommandHandler<CreateUserCommand, string> {
   private readonly db: DataBase;
@@ -19,7 +20,23 @@ export class CreateUserCommandHandler implements CommandHandler<CreateUserComman
       throw new EmailAlreadyExistsError(command.payload.email);
     }
 
-    const user = await this.db.insert(users).values(command.payload).returning({ id: users.id });
+    const hashedPassword = await argon2.hash(command.payload.password);
+
+    const user = await this.db
+      .insert(users)
+      .values({
+        ...command.payload,
+        password: hashedPassword
+      })
+      .returning({ id: users.id });
+
+    const userId = user[0].id;
+
+    await this.db.insert(userPreferences).values({
+      userId,
+      mutedAll: false,
+      theme: "system"
+    });
 
     return user[0].id;
   }

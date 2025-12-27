@@ -7,9 +7,10 @@ import { CursorPagingDTO, Paginated } from "@api/shared/types/pagination";
 import { and, eq, sql } from "drizzle-orm";
 import type Redis from "ioredis";
 
-export class GetConversationsQueryHandler
-  implements QueryHandler<GetConversationsQuery, Paginated<ConversationDTO>>
-{
+export class GetConversationsQueryHandler implements QueryHandler<
+  GetConversationsQuery,
+  Paginated<ConversationDTO>
+> {
   private readonly db: DataBase;
   private readonly redis: Redis;
   constructor({ db, redis }: { db: DataBase; redis: Redis }) {
@@ -22,21 +23,28 @@ export class GetConversationsQueryHandler
       return sql<number>`
         (
           SELECT
-            COUNT(*)
+            LEAST(COUNT(*), 100)
           FROM
-            messages m
-          WHERE
-            m.conversation_id = conversations.id
-            AND m.timestamp > (
+            (
               SELECT
-                m2.timestamp
+                1
               FROM
-                messages m2
-                JOIN conversation_participants cp2 ON cp2.last_read_message_id = m2.id
+                messages m
               WHERE
-                cp2.conversation_id = conversations.id
-                AND cp2.user_id = ${userId}
-            )
+                m.conversation_id = conversations.id
+                AND m.sender_id != ${userId}
+                AND m.id > (
+                  SELECT
+                    cp2.last_read_message_id
+                  FROM
+                    conversation_participants cp2
+                  WHERE
+                    cp2.conversation_id = conversations.id
+                    AND cp2.user_id = ${userId}
+                )
+              LIMIT
+                100
+            ) AS limited
         )
       `.as("unreadCount");
     }
@@ -61,7 +69,7 @@ export class GetConversationsQueryHandler
     const userConversations = await this.db.query.conversations.findMany({
       with: {
         messages: {
-          orderBy: (m, { desc }) => [desc(m.timestamp)],
+          orderBy: (m, { desc }) => [desc(m.id)],
           limit: 1,
           // with: {
           //   sender: {
@@ -69,6 +77,22 @@ export class GetConversationsQueryHandler
           //   }
           // },
           columns: { id: true, senderId: true, content: true, type: true, timestamp: true }
+        },
+        participants: {
+          columns: {
+            conversationId: true,
+            userId: true,
+            muted: true
+          },
+          with: {
+            user: {
+              columns: {
+                fullname: true,
+                avatar: true,
+                bio: true
+              }
+            }
+          }
         }
       },
       columns: {
@@ -107,34 +131,6 @@ export class GetConversationsQueryHandler
       limit: query.payload.paging.limit + 1
     });
 
-    const others = await this.db.query.conversationParticipants.findMany({
-      where: (cp, { inArray, ne }) =>
-        inArray(
-          cp.conversationId,
-          userConversations.map((c) => c.id)
-        ) && ne(cp.userId, query.payload.userId),
-      columns: {
-        conversationId: true,
-        userId: true
-      },
-      with: {
-        user: {
-          columns: {
-            fullname: true,
-            avatar: true
-          }
-        }
-      }
-    });
-
-    const othersByConversation = new Map<string, (typeof others)[number][]>();
-
-    others.forEach((cp) => {
-      const arr = othersByConversation.get(cp.conversationId) ?? [];
-      arr.push(cp);
-      othersByConversation.set(cp.conversationId, arr);
-    });
-
     const hasNextPage = userConversations.length > query.payload.paging.limit;
     const sliced = hasNextPage
       ? userConversations.slice(0, query.payload.paging.limit)
@@ -143,7 +139,15 @@ export class GetConversationsQueryHandler
     const items: ConversationDTO[] = await Promise.all(
       sliced.map(async (conv) => {
         const lastMessage = conv.messages[0] ?? null;
-        const otherParticipants = othersByConversation.get(conv.id) ?? [];
+        const thisConversation = userConversations.find((i) => i.id === conv.id);
+
+        const otherParticipants = (thisConversation?.participants ?? []).filter(
+          (p) => p.userId !== query.payload.userId
+        );
+
+        const thisUser = (thisConversation?.participants ?? []).find(
+          (p) => p.userId === query.payload.userId
+        );
 
         const online = new Set(await this.redis.smembers(`presence:conversation:${conv.id}`));
 
@@ -152,10 +156,13 @@ export class GetConversationsQueryHandler
           isGroup: conv.isGroup,
           name: conv.isGroup ? conv.name : (otherParticipants[0]?.user.fullname ?? conv.name),
           avatar: conv.isGroup ? null : (otherParticipants[0]?.user.avatar ?? null),
+          bio: conv.isGroup ? null : (otherParticipants[0]?.user.bio ?? null),
           participants: otherParticipants.map((p) => ({
             userId: p.userId,
-            status: online.has(p.userId) ? ("online" as const) : ("offline" as const)
+            status: online.has(p.userId) ? ("online" as const) : ("offline" as const),
+            username: p.user.fullname
           })),
+          isMuted: thisUser.muted,
           lastMessage,
           unreadCount: conv.unreadCount,
           createdAt: conv.createdAt,

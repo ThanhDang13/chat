@@ -1,4 +1,4 @@
-import { hash } from "bcryptjs";
+import * as argon2 from "argon2";
 
 import { CommandHandler } from "@api/shared/commands/command-handler";
 import { SignUpCommand } from "@api/modules/auth/application/commands/signup/signup.command";
@@ -16,7 +16,7 @@ export class SignUpCommandHandler implements CommandHandler<SignUpCommand, strin
     const userId = await this.commandBus.execute<CreateUserCommand, string>(
       new CreateUserCommand({
         ...command.payload,
-        password: await hash(command.payload.password, 10)
+        password: command.payload.password
       })
     );
 

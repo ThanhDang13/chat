@@ -10,6 +10,7 @@ import { GetParticipantsQuery } from "@api/modules/conversation/application/quer
 import { GetParticipantsQueryHandler } from "@api/modules/conversation/application/queries/get-participants/get-participants.handler";
 import { UserConnectedEventHandler } from "@api/modules/conversation/application/event-handlers/user-connected.handler";
 import {
+  ConversationCreatedEvent,
   ConversationReadUpdateEvent,
   UserConnectedEvent,
   UserDisconnectedEvent
@@ -23,6 +24,9 @@ import { GetPrivateConversationQuery } from "@api/modules/conversation/applicati
 import { CreateConversationCommand } from "@api/modules/conversation/application/commands/create-conversation/create-conversation.command";
 import { GetConversationByIdQuery } from "@api/modules/conversation/application/queries/get-conversation-by-id/get-conversation-by-id.query";
 import { GetConversationByIdQueryHandler } from "@api/modules/conversation/application/queries/get-conversation-by-id/get-conversation-by-id.handler";
+import { UpdateConversationMuteStatusCommand } from "@api/modules/conversation/application/commands/update-conversation-mute-status/update-conversation-mute-status.command";
+import { UpdateConversationMuteStatusCommandHandler } from "@api/modules/conversation/application/commands/update-conversation-mute-status/update-conversation-mute-status.handler";
+import { ConversationCreatedEventHandler } from "@api/modules/conversation/application/event-handlers/conversation-created.handler";
 
 export default fp(
   async (fastify, opts: ModuleOptions) => {
@@ -51,11 +55,15 @@ export default fp(
     diContainer.register({
       userConnectedEventHandler: asClass(UserConnectedEventHandler).scoped(),
       userDisconnectedEventHandler: asClass(UserDisconnectedEventHandler).scoped(),
-      conversationReadUpdateEventHandler: asClass(ConversationReadUpdateEventHandler).scoped()
+      conversationReadUpdateEventHandler: asClass(ConversationReadUpdateEventHandler).scoped(),
+      conversationCreatedEventHandler: asClass(ConversationCreatedEventHandler).scoped()
     });
 
     diContainer.register({
-      createConversationCommandHandler: asClass(CreateConversationCommandHandler).scoped()
+      createConversationCommandHandler: asClass(CreateConversationCommandHandler).scoped(),
+      updateConversationMuteStatusCommandHandler: asClass(
+        UpdateConversationMuteStatusCommandHandler
+      ).scoped()
     });
 
     fastify.queryBus.register(
@@ -83,6 +91,11 @@ export default fp(
       fastify.diContainer.cradle.createConversationCommandHandler
     );
 
+    fastify.commandBus.register(
+      UpdateConversationMuteStatusCommand.type,
+      fastify.diContainer.cradle.updateConversationMuteStatusCommandHandler
+    );
+
     fastify.ready(() => {
       fastify.eventBus.register(
         UserConnectedEvent.type,
@@ -95,6 +108,10 @@ export default fp(
       fastify.eventBus.register(
         ConversationReadUpdateEvent.type,
         fastify.diContainer.cradle.conversationReadUpdateEventHandler
+      );
+      fastify.eventBus.register(
+        ConversationCreatedEvent.type,
+        fastify.diContainer.cradle.conversationCreatedEventHandler
       );
       fastify.io.on("connection", (socket: Socket) => {
         fastify.eventBus.publish(new UserConnectedEvent({ socketId: socket.id }));

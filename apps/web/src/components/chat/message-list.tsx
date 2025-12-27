@@ -7,14 +7,27 @@ import { createInfiniteMessagesQueryOptions } from "@web/lib/tanstack/options/ch
 import { formatDividerTime, getMessageGroupInfo } from "@web/lib/message";
 import { createParticipantsQueryOptions } from "@web/lib/tanstack/options/conversation/participant";
 import { useAuthStore } from "@web/stores/auth-store";
-import { useEffect, useMemo, useRef } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, type Transition } from "framer-motion";
 import { Skeleton } from "@web/components/ui/skeleton";
 import { useSocketStore } from "@web/stores/socket-store";
 import { Message } from "@api/modules/message/domain/message.domain";
 import { Avatar, AvatarFallback, AvatarImage } from "@web/components/ui/avatar";
 import { useConversationReadListener } from "@web/hooks/socket/use-conversation-read-listener";
 import { resetConversationUnreadCount } from "@web/lib/tanstack/query-cache/reset-unread-count";
+import { Button } from "@web/components/ui/button";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle
+} from "@web/components/ui/empty";
+import { ChevronDown, MessageSquareText } from "lucide-react";
+import { AvatarGroup, AvatarGroupTooltip } from "@web/components/ui/avatar-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@web/components/ui/tooltip";
+import { Spinner } from "@web/components/ui/spinner";
+import { AvatarWithStatus } from "@web/components/avatar-with-status";
 
 interface MessageListProps {
   conversationId: string;
@@ -25,21 +38,27 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
   const { me } = useAuthStore();
   const socket = useSocketStore((s) => s.socket);
   const queryClient = useQueryClient();
+  const [jumpToMessageId, setJumpToMessageId] = useState<string | undefined>(undefined);
   const {
     data: messagesPages,
     fetchNextPage,
+    fetchPreviousPage,
     hasNextPage,
+    hasPreviousPage,
     isFetchingNextPage,
+    isFetchingPreviousPage,
     isLoading,
-    isError
+    isError,
+    isFetching
   } = useInfiniteQuery({
     ...createInfiniteMessagesQueryOptions({
       conversationId,
-      opts: { type: "cursor", limit: 30 }
+      opts: { limit: 20, before: jumpToMessageId }
     }),
     enabled: !!conversationId
   });
 
+  //TODO: Add this user state to be returned from api so can handle last read
   const { data: participantsData } = useQuery({
     ...createParticipantsQueryOptions({ conversationId }),
     enabled: !!conversationId
@@ -48,11 +67,16 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
   const messages = useMemo(() => {
     if (!messagesPages?.pages) return [];
 
-    return messagesPages.pages.flatMap((page) => page.data ?? []).reverse();
+    return messagesPages.pages.flatMap((page) => page.data ?? []);
   }, [messagesPages]);
+
   const participants = useMemo(
     () => (Array.isArray(participantsData) ? participantsData : []),
     [participantsData]
+  );
+  const thisParticipant = useMemo(
+    () => participants.find((p) => p.userId === me?.id),
+    [me?.id, participants]
   );
   const lastEmittedId = useRef<string | null>(null);
 
@@ -72,6 +96,7 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
   const virtualizer = useVirtualizer({
     count: messages?.length ?? 0,
     estimateSize: () => 95,
+    overscan: 5,
     getScrollElement: () => containerRef.current
   });
 
@@ -88,42 +113,70 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
       scrollToBottomAnchor({ behavior: "smooth" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, typingUsers]);
+  }, [typingUsers]);
 
   useEffect(() => {
     if (!socket || messages.length === 0) return;
-
     if (virtualItems.length === 0) return;
+    if (!thisParticipant || !me) return;
 
-    const newestPage = messagesPages?.pages[0];
-    if (!newestPage) return;
+    const lastVisibleItem = virtualItems[virtualItems.length - 1];
+    const lastVisibleMessage = messages[lastVisibleItem.index];
+    if (!("id" in lastVisibleMessage)) return;
 
-    const lastMessage = [...newestPage.data].find((m): m is Message => "id" in m && !!m.id);
+    if (
+      !thisParticipant.lastReadMessageId ||
+      lastVisibleMessage.id > thisParticipant.lastReadMessageId
+    ) {
+      queryClient.setQueryData<typeof participantsData>(
+        ["participants", conversationId],
+        (oldData) => {
+          if (!oldData) return oldData;
 
-    if (!lastMessage) return;
-
-    const lastVisible = virtualItems[virtualItems.length - 1];
-
-    const isLastMessageVisible = lastVisible.index === messages.length - 1;
-
-    if (isLastMessageVisible && lastEmittedId.current !== lastMessage.id) {
-      lastEmittedId.current = lastMessage.id;
+          return oldData.map((user) => {
+            if (user.userId === me.id) {
+              return {
+                ...user,
+                lastReadMessageId: lastVisibleMessage.id
+              };
+            }
+            return user;
+          });
+        }
+      );
 
       socket.emit("conversation:read:update", {
         conversationId,
-        lastReadMessageId: lastMessage.id
+        lastReadMessageId: lastVisibleMessage.id
       });
 
       resetConversationUnreadCount(queryClient, conversationId);
 
-      console.log("[read:update]", lastMessage.id);
+      console.log("[read:update]", lastVisibleMessage.id);
     }
-  }, [virtualItems, messages, conversationId, socket, messagesPages]);
+  }, [virtualItems, messages, conversationId, socket, queryClient, thisParticipant, me]);
 
   useEffect(() => {
-    scrollToBottom();
+    scrollToBottomAnchor({ behavior: "instant" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
+
+  useEffect(() => {
+    if (!jumpToMessageId) return;
+    requestAnimationFrame(() => {
+      const jumpToMessageIndex = messages.findIndex(
+        (m): m is Message => "id" in m && m.id === jumpToMessageId
+      );
+      console.log(jumpToMessageIndex);
+      if (jumpToMessageIndex === -1) {
+        scrollToBottomAnchor({ behavior: "instant" });
+        return;
+      }
+      virtualizer.scrollToIndex(jumpToMessageIndex, { align: "center", behavior: "auto" });
+    });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jumpToMessageId]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -133,37 +186,84 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
     const observer = new IntersectionObserver(
       async ([entry]) => {
         if (!entry.isIntersecting) return;
-        if (!hasNextPage || isFetchingNextPage) return;
+        if (!hasPreviousPage || isFetchingPreviousPage) return;
 
-        const result = await fetchNextPage();
+        const result = await fetchPreviousPage();
 
-        const index = result.data?.pages[result.data.pages.length - 1].data.length ?? 0;
-        requestAnimationFrame(() => {
-          console.log("Last page length:", index);
-          virtualizer.scrollToIndex(index, { align: "start" });
-        });
+        const index = result.data?.pages[0].data.length ?? 0;
+
+        console.log("Previous page length:", index);
+        virtualizer.scrollToIndex(index, { align: "start", behavior: "auto" });
       },
       {
         root: container,
-        threshold: 0.1
+        threshold: 1
       }
     );
 
     observer.observe(anchor);
     return () => observer.disconnect();
   }, [
-    hasNextPage,
-    fetchNextPage,
-    isFetchingNextPage,
     containerRef,
     virtualizer,
-    messagesPages?.pages
+    messagesPages?.pages,
+    hasPreviousPage,
+    isFetchingPreviousPage,
+    fetchPreviousPage
   ]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const anchor = bottomAnchorRef.current;
+    if (!container || !anchor) return;
+
+    const observer = new IntersectionObserver(
+      async ([entry]) => {
+        if (!entry.isIntersecting) return;
+        if (!hasNextPage || isFetchingNextPage || isFetching) return;
+
+        fetchNextPage();
+      },
+      {
+        root: container,
+        threshold: 1
+      }
+    );
+
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, [
+    containerRef,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    bottomAnchorRef,
+    messages.length,
+    virtualizer,
+    isFetching
+  ]);
+
+  if (isError) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MessageSquareText className="text-destructive h-8 w-8" />
+            </EmptyMedia>
+            <EmptyTitle>Failed to load messages</EmptyTitle>
+            <EmptyDescription>
+              Something went wrong while fetching messages. Please try again.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
       <div className="flex-1 space-y-4">
-        {/* First message group with time divider */}
         <div className="px-4">
           <div className="my-3 flex justify-center">
             <Skeleton className="h-6 w-32 rounded-full" />
@@ -254,15 +354,54 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
     );
   }
 
+  if ((!messages?.length || !messages) && !isFetching) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <MessageSquareText className="h-8 w-8" />
+            </EmptyMedia>
+            <EmptyTitle>No messages yet</EmptyTitle>
+            <EmptyDescription>Start the conversation by sending a message.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      </div>
+    );
+  }
+
   return (
     <ScrollArea
       ref={containerRef}
       style={{ overflowY: "scroll" }}
       onScroll={handleScroll}
       onTouchStart={handleTouchStart}
-      className="flex-1"
+      className="h-full flex-1"
     >
       <div ref={topAnchorRef} />
+      {isFetchingPreviousPage && (
+        <div className="flex justify-center py-2">
+          <Spinner className="size-8" />
+        </div>
+      )}
+      {!hasPreviousPage && (
+        <div className="flex justify-center py-8">
+          <Empty className="w-72">
+            <EmptyHeader className="space-y-2 text-center">
+              <EmptyMedia variant="icon" className="mx-auto">
+                <MessageSquareText className="text-muted-foreground h-10 w-10" />
+              </EmptyMedia>
+              <EmptyTitle className="text-muted-foreground text-sm font-semibold">
+                Start of Conversation
+              </EmptyTitle>
+              <EmptyDescription className="text-muted-foreground/80 text-sm">
+                You’ve reached the oldest messages
+              </EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+        </div>
+      )}
+
       <div className="relative" style={{ height: `${virtualizer.getTotalSize()}px` }}>
         <div
           className="space-y-1 px-4"
@@ -285,15 +424,10 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
             );
 
             return (
-              <div
-                className="px-4"
-                key={vItem.key}
-                data-index={vItem.index}
-                ref={virtualizer.measureElement}
-              >
+              <div key={vItem.key} data-index={vItem.index} ref={virtualizer.measureElement}>
                 {hasTimeDiff && (
-                  <div className="my-3 flex justify-center">
-                    <span className="rounded-full bg-gray-200 px-3 py-1 text-xs text-gray-600">
+                  <div className="my-4 flex justify-center">
+                    <span className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs shadow-sm">
                       {formatDividerTime(message.timestamp)}
                     </span>
                   </div>
@@ -309,39 +443,87 @@ export function MessageList({ conversationId, isGroupChat }: MessageListProps) {
               </div>
             );
           })}
-          {typingUsers?.length ? (
-            <div className="flex items-end space-x-2 px-4 pt-4">
-              {/* avatar */}
-              <img
-                src={typingUsers?.[0]?.avatar ?? "/placeholder.svg"}
-                alt={typingUsers?.[0]?.fullname ?? "User"}
-                className="h-8 w-8 rounded-full object-cover"
-              />
-
-              {/* bubble */}
-              <div className="bg-muted flex max-w-xs items-center gap-1 rounded-2xl px-3 py-3">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="h-2 w-2 rounded-full bg-[color:var(--color-typing-indicator)]"
-                    animate={{
-                      scale: [1, 1.3, 1],
-                      opacity: [0.5, 1, 0.5]
-                    }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: 1.2,
-                      delay: i * 0.2,
-                      ease: "easeInOut"
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
+          {/* {!isAtBottom && (
+            <Button
+              className="bg-primary text-primary-foreground fixed right-6 bottom-20 z-10 rounded-full p-3 shadow-lg"
+              onClick={() => scrollToBottom()}
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          )} */}
+          <TypingIndicator typingUsers={typingUsers} isGroupChat={isGroupChat} />
         </div>
       </div>
       <div ref={bottomAnchorRef} />
+      {isFetchingNextPage && (
+        <div className="flex justify-center py-2">
+          <Spinner className="size-8" />
+        </div>
+      )}
     </ScrollArea>
+  );
+}
+
+interface TypingIndicatorProps {
+  typingUsers: Array<{ avatar?: string | null; fullname?: string }>;
+  isGroupChat: boolean;
+}
+
+const TYPING_INDICATOR_MAX_VISIBLE = 3;
+
+function TypingIndicator({ typingUsers, isGroupChat }: TypingIndicatorProps) {
+  if (!typingUsers?.length) return null;
+
+  let typingText = "";
+
+  if (typingUsers.length === 1) {
+    typingText = `${typingUsers[0].fullname} is typing…`;
+  } else if (typingUsers.length === 2) {
+    typingText = `${typingUsers[0].fullname} and ${typingUsers[1].fullname} are typing…`;
+  } else {
+    const first = typingUsers[0].fullname;
+    const others = typingUsers.length - 1;
+    typingText = `${first} and ${others} others are typing…`;
+  }
+
+  return (
+    <div className="flex items-end gap-2 pt-4">
+      {isGroupChat && (
+        <AvatarGroup variant="motion" className="-space-x-3">
+          {typingUsers.slice(0, TYPING_INDICATOR_MAX_VISIBLE).map((user, index) => (
+            <AvatarWithStatus
+              key={index}
+              name={user.fullname ?? "Unknown"}
+              avatar={user.avatar}
+              isOnline={false}
+              size={40}
+              inGroup={true}
+              showToolTip={false}
+            />
+          ))}
+        </AvatarGroup>
+      )}
+
+      {/* typing dots */}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="bg-muted -mt-1 mb-1 flex items-center gap-1 rounded-2xl px-3 py-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="bg-foreground/50 h-2 w-2 rounded-full"
+                animate={{ opacity: [0.4, 1, 0.4] }}
+                transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
+              />
+            ))}
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          <p className="text-muted-foreground flex animate-pulse items-center gap-1 text-xs leading-none italic">
+            {typingText}
+          </p>
+        </TooltipContent>
+      </Tooltip>
+    </div>
   );
 }

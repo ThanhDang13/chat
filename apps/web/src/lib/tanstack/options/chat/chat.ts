@@ -1,6 +1,9 @@
 import { InfiniteData, UseInfiniteQueryOptions } from "@tanstack/react-query";
 import axiosInstance from "@web/lib/axios/instance";
-import { type CursorPagingDTO } from "@api/shared/types/pagination";
+import {
+  type BidirectionalCursorPagingDTO,
+  type CursorPagingDTO
+} from "@api/shared/types/pagination";
 import { type GetMessagesResponseDTO } from "@api/modules/message/application/queries/get-messages/get-messages.dto";
 import { Message, PendingMessage } from "@api/modules/message/domain/message.domain";
 
@@ -8,7 +11,10 @@ export type MessagesPage = Omit<GetMessagesResponseDTO["payload"], "data"> & {
   data: (Message | PendingMessage)[];
 };
 
-const getInfiniteMessagesByConversationId = async (id: string, paging: CursorPagingDTO) => {
+const getInfiniteMessagesByConversationId = async (
+  id: string,
+  paging: BidirectionalCursorPagingDTO
+) => {
   const response = await axiosInstance.get<GetMessagesResponseDTO>(
     `/conversations/${id}/messages`,
     { params: paging }
@@ -21,25 +27,49 @@ export const createInfiniteMessagesQueryOptions = ({
   opts
 }: {
   conversationId: string;
-  opts: CursorPagingDTO;
+  opts: Pick<BidirectionalCursorPagingDTO, "before" | "limit">;
 }): UseInfiniteQueryOptions<
   GetMessagesResponseDTO["payload"],
   Error,
   InfiniteData<MessagesPage>,
   unknown[],
-  Date | undefined
+  { cursor: string | undefined; direction: "previous" | "next" }
 > => {
   return {
     queryKey: ["messages", conversationId],
-    queryFn: ({ pageParam = undefined }) => {
+    queryFn: ({ pageParam }) => {
+      if (pageParam.direction === "next") {
+        return getInfiniteMessagesByConversationId(conversationId, {
+          type: "cursor",
+          ...opts,
+          before: undefined,
+          after: pageParam.cursor
+        });
+      }
+
       return getInfiniteMessagesByConversationId(conversationId, {
-        type: opts.type,
-        limit: opts.limit,
-        cursor: pageParam
+        type: "cursor",
+        ...opts,
+        after: undefined,
+        before: pageParam.cursor
       });
     },
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    initialPageParam: opts.cursor,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasNextPage
+        ? {
+            cursor: lastPage.nextCursor,
+            direction: "next"
+          }
+        : null,
+
+    getPreviousPageParam: (firstPage) =>
+      firstPage.hasPrevPage
+        ? {
+            cursor: firstPage.prevCursor,
+            direction: "previous"
+          }
+        : null,
+    initialPageParam: { cursor: opts.before ?? undefined, direction: "previous" },
     refetchOnWindowFocus: false,
     staleTime: Infinity
   };

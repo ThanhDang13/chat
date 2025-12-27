@@ -21,7 +21,7 @@ export const useSocketStore = create<SocketState>()(
       if (!me || !token) return;
       if (currentSocket?.connected || currentSocket) return;
 
-      const newSocket = io(env.SEVER_URL, {
+      const newSocket = io(env.VITE_SERVER_URL, {
         path: "/socket.io",
         auth: { token },
         autoConnect: false

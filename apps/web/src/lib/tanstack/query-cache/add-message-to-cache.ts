@@ -11,19 +11,20 @@ export function addMessageToCache({
   conversationId: string;
   message: Message | PendingMessage;
 }) {
-  queryClient.setQueryData<InfiniteData<MessagesPage>>(["messages", conversationId], (old) =>
-    old
-      ? {
-          ...old,
-          pages: old.pages.map((page, i) =>
-            i === 0
-              ? {
-                  ...page,
-                  data: [message, ...page.data]
-                }
-              : page
-          )
-        }
-      : old
-  );
+  queryClient.setQueryData<InfiniteData<MessagesPage>>(["messages", conversationId], (old) => {
+    if (!old || old.pages.length === 0) return old;
+
+    // Only add if last page is the newest
+    const lastPageIndex = old.pages.length - 1;
+    const lastPage = old.pages[lastPageIndex];
+
+    if (!lastPage.hasNextPage) {
+      const newPages = old.pages.map((page, i) =>
+        i === lastPageIndex ? { ...page, data: [...page.data, message] } : page
+      );
+      return { ...old, pages: newPages };
+    }
+
+    return old;
+  });
 }

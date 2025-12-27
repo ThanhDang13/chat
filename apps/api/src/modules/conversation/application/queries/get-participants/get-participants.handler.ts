@@ -6,9 +6,10 @@ import { UnauthorizedError } from "@api/shared/errors/unauthorized.error";
 import { QueryHandler } from "@api/shared/queries/query-handler";
 import { and, eq, ne } from "drizzle-orm";
 
-export class GetParticipantsQueryHandler
-  implements QueryHandler<GetParticipantsQuery, ParticipantDTO[]>
-{
+export class GetParticipantsQueryHandler implements QueryHandler<
+  GetParticipantsQuery,
+  ParticipantDTO[]
+> {
   private readonly db: DataBase;
   constructor({ db }: { db: DataBase }) {
     this.db = db;
@@ -23,7 +24,6 @@ export class GetParticipantsQueryHandler
 
     if (!isMember) throw new UnauthorizedError("Not part of this conversation");
 
-    // Fetch participants
     const participants = await this.db
       .select({
         userId: users.id,
@@ -35,8 +35,8 @@ export class GetParticipantsQueryHandler
       .innerJoin(users, eq(conversationParticipants.userId, users.id))
       .where(
         and(
-          eq(conversationParticipants.conversationId, conversationId),
-          ne(conversationParticipants.userId, userId)
+          eq(conversationParticipants.conversationId, conversationId)
+          // ne(conversationParticipants.userId, userId)
         )
       );
 

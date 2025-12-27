@@ -2,7 +2,7 @@ import { ConversationDTO } from "@api/modules/conversation/application/queries/g
 import { InfiniteData, QueryClient } from "@tanstack/react-query";
 import type { ConversationsPage } from "@web/lib/tanstack/options/conversation/conversation";
 
-export function addMessageToCache({
+export function addConversationToCache({
   queryClient,
   conversation
 }: {
@@ -10,7 +10,7 @@ export function addMessageToCache({
   conversation: ConversationDTO;
 }) {
   queryClient.setQueryData<InfiniteData<ConversationsPage>>(["conversations"], (old) => {
-    if (!old)
+    if (!old || !Array.isArray(old.pages) || old.pages.length === 0) {
       return {
         pages: [
           {
@@ -19,25 +19,21 @@ export function addMessageToCache({
             hasNextPage: true,
             paging: {
               type: "cursor",
-              limit: 1
+              limit: 1,
+              cursor: undefined
             }
           }
         ],
         pageParams: [undefined]
       };
+    }
 
     const firstPage = old.pages[0];
-    const updatedPage = {
-      ...firstPage,
-      payload: {
-        ...firstPage,
-        data: [conversation, ...firstPage.data]
-      }
-    };
+    const firstPageData = Array.isArray(firstPage.data) ? firstPage.data : [];
 
     return {
       ...old,
-      pages: [updatedPage, ...old.pages.slice(1)]
+      pages: [{ ...firstPage, data: [conversation, ...firstPageData] }, ...old.pages.slice(1)]
     };
   });
 }

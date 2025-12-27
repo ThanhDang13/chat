@@ -10,9 +10,12 @@ export const conversationDTOSchema = z.object({
   participants: z.array(
     z.object({
       userId: z.string(),
-      status: z.enum(["online", "offline"])
+      status: z.enum(["online", "offline"]),
+      username: z.string()
     })
   ),
+  isMuted: z.boolean().default(false),
+  bio: z.string().nullable(),
   lastMessage: z
     .object({
       id: z.string(),

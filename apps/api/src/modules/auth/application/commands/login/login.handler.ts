@@ -1,4 +1,4 @@
-import { compare } from "bcryptjs";
+import * as argon2 from "argon2";
 import {
   LoginCommand,
   LoginCommandResult
@@ -26,7 +26,7 @@ export class LoginCommandHandler implements CommandHandler<LoginCommand, LoginCo
       throw new UnauthorizedError("Invalid email or password");
     }
 
-    const isMatch = await compare(command.payload.password, user.password);
+    const isMatch = await argon2.verify(user.password, command.payload.password);
 
     if (!isMatch) {
       throw new UnauthorizedError("Invalid email or password");

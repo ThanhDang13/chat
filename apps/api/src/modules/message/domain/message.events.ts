@@ -5,9 +5,10 @@ export type MessageCreatedPayload = {
   message: Message;
 };
 
-export class MessageCreatedEvent
-  implements Event<typeof MessageCreatedEvent.type, MessageCreatedPayload>
-{
+export class MessageCreatedEvent implements Event<
+  typeof MessageCreatedEvent.type,
+  MessageCreatedPayload
+> {
   static readonly type = "MessageCreatedEvent";
   readonly type = MessageCreatedEvent.type;
   constructor(public readonly payload: MessageCreatedPayload) {}

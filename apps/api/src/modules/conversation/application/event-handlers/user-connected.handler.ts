@@ -23,6 +23,7 @@ export class UserConnectedEventHandler implements IEventHandler<UserConnectedEve
       .from(conversationParticipants)
       .where(eq(conversationParticipants.userId, socket.data.user.id));
     socket.data.conversations = conversationsOfUser;
+    socket.join(`user:${socket.data.user.id}`);
     conversationsOfUser.map(async (conversation) => {
       socket.join(conversation.id);
       socket

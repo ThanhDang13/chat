@@ -1,10 +1,20 @@
 import { relations } from "drizzle-orm";
-import { users, conversations, conversationParticipants, messages } from "./schema"; // adjust path as needed
+import {
+  users,
+  conversations,
+  conversationParticipants,
+  messages,
+  userPreferences
+} from "./schema"; // adjust path as needed
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
   conversationsCreated: many(conversations, { relationName: "creator" }),
   messages: many(messages, { relationName: "sentMessages" }),
-  conversationParticipants: many(conversationParticipants)
+  conversationParticipants: many(conversationParticipants),
+  preferences: one(userPreferences, {
+    fields: [users.id],
+    references: [userPreferences.userId]
+  })
 }));
 
 export const conversationsRelations = relations(conversations, ({ many, one }) => ({

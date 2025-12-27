@@ -2,13 +2,18 @@ import { CommandHandler } from "@api/shared/commands/command-handler";
 import { CreateConversationCommand } from "./create-conversation.command";
 import { DataBase } from "@api/infra/database";
 import { conversations, conversationParticipants } from "@api/infra/database/schema";
+import { ConversationCreatedEvent } from "@api/modules/conversation/domain/conversation.events";
+import { RedisEventBus } from "@api/infra/plugins/event-bus";
 
-export class CreateConversationCommandHandler
-  implements CommandHandler<CreateConversationCommand, { id: string }>
-{
+export class CreateConversationCommandHandler implements CommandHandler<
+  CreateConversationCommand,
+  { id: string }
+> {
   private readonly db: DataBase;
-  constructor({ db }: { db: DataBase }) {
+  private readonly eventBus: RedisEventBus;
+  constructor({ db, eventBus }: { db: DataBase; eventBus: RedisEventBus }) {
     this.db = db;
+    this.eventBus = eventBus;
   }
 
   async execute(command: CreateConversationCommand): Promise<{ id: string }> {
@@ -31,6 +36,16 @@ export class CreateConversationCommandHandler
         isGroup,
         role: userId === createdBy ? "owner" : "member"
       }))
+    );
+
+    this.eventBus.publish(
+      new ConversationCreatedEvent({
+        conversationId: conv.id,
+        participantIds,
+        isGroup,
+        name: isGroup ? (name ?? "New Group") : null,
+        createdBy
+      })
     );
 
     return { id: conv.id };

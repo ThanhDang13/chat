@@ -6,9 +6,10 @@ import { QueryHandler } from "@api/shared/queries/query-handler";
 import { and, eq, sql } from "drizzle-orm";
 import type Redis from "ioredis";
 
-export class GetConversationByIdQueryHandler
-  implements QueryHandler<GetConversationByIdQuery, ConversationDTO>
-{
+export class GetConversationByIdQueryHandler implements QueryHandler<
+  GetConversationByIdQuery,
+  ConversationDTO
+> {
   private readonly db: DataBase;
   private readonly redis: Redis;
 
@@ -24,21 +25,28 @@ export class GetConversationByIdQueryHandler
       return sql<number>`
         (
           SELECT
-            COUNT(*)
+            LEAST(COUNT(*), 100)
           FROM
-            ${messages} m
-          WHERE
-            m.conversation_id = ${conversations.id}
-            AND m.timestamp > (
+            (
               SELECT
-                m2.timestamp
+                1
               FROM
-                ${messages} m2
-                JOIN ${conversationParticipants} cp2 ON cp2.last_read_message_id = m2.id
+                messages m
               WHERE
-                cp2.conversation_id = ${conversations.id}
-                AND cp2.user_id = ${userId}
-            )
+                m.conversation_id = conversations.id
+                AND m.sender_id != ${userId}
+                AND m.id > (
+                  SELECT
+                    cp2.last_read_message_id
+                  FROM
+                    conversation_participants cp2
+                  WHERE
+                    cp2.conversation_id = conversations.id
+                    AND cp2.user_id = ${userId}
+                )
+              LIMIT
+                100
+            ) AS limited
         )
       `.as("unreadCount");
     }
@@ -77,9 +85,30 @@ export class GetConversationByIdQueryHandler
       },
       with: {
         messages: {
-          orderBy: (m, { desc }) => [desc(m.timestamp)],
+          orderBy: (m, { desc }) => [desc(m.id)],
           limit: 1,
+          // with: {
+          //   sender: {
+          //     columns: { fullname: true }
+          //   }
+          // },
           columns: { id: true, senderId: true, content: true, type: true, timestamp: true }
+        },
+        participants: {
+          columns: {
+            conversationId: true,
+            userId: true,
+            muted: true
+          },
+          with: {
+            user: {
+              columns: {
+                fullname: true,
+                avatar: true,
+                bio: true
+              }
+            }
+          }
         }
       },
       extras: {
@@ -90,37 +119,48 @@ export class GetConversationByIdQueryHandler
 
     if (!conv) throw new Error("Conversation not found");
 
-    const others = await this.db.query.conversationParticipants.findMany({
-      where: (cp, { eq, ne }) => and(eq(cp.conversationId, conversationId), ne(cp.userId, userId)),
-      columns: {
-        conversationId: true,
-        userId: true
-      },
-      with: {
-        user: {
-          columns: {
-            fullname: true,
-            avatar: true
-          }
-        }
-      }
-    });
+    // const others = await this.db.query.conversationParticipants.findMany({
+    //   where: (cp, { eq, ne }) => and(eq(cp.conversationId, conversationId), ne(cp.userId, userId)),
+    //   columns: {
+    //     conversationId: true,
+    //     userId: true
+    //   },
+    //   with: {
+    //     user: {
+    //       columns: {
+    //         fullname: true,
+    //         avatar: true
+    //       }
+    //     }
+    //   }
+    // });
 
     const online = new Set(await this.redis.smembers(`presence:conversation:${conversationId}`));
 
     const lastMessage = conv.messages[0] ?? null;
-    const otherParticipants = others ?? [];
+    const otherParticipants = (conv?.participants ?? []).filter(
+      (p) => p.userId !== query.payload.userId
+    );
 
+    const thisUser = (conv?.participants ?? []).find((p) => p.userId === query.payload.userId);
+    console.log(conv.unreadCount);
     return {
       id: conv.id,
       isGroup: conv.isGroup,
       name: conv.isGroup ? conv.name : (otherParticipants[0]?.user.fullname ?? conv.name),
       avatar: conv.isGroup ? null : (otherParticipants[0]?.user.avatar ?? null),
+      bio: conv.isGroup ? null : (otherParticipants[0]?.user.bio ?? null),
       participants: otherParticipants.map((p) => ({
         userId: p.userId,
-        status: online.has(p.userId) ? ("online" as const) : ("offline" as const)
+        status: online.has(p.userId) ? ("online" as const) : ("offline" as const),
+        username: p.user.fullname
       })),
-      lastMessage,
+      isMuted: thisUser.muted,
+      lastMessage: lastMessage
+        ? {
+            ...lastMessage
+          }
+        : null,
       unreadCount: conv.unreadCount,
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,

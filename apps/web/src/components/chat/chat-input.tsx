@@ -9,9 +9,15 @@ import { useSocketStore } from "@web/stores/socket-store";
 import { MessagesPage } from "@web/lib/tanstack/options/chat/chat";
 import { PendingMessage } from "@api/modules/message/domain/message.domain";
 import type { CallbackMessage } from "@api/modules/message/application/commands/create-message/create-message.dto";
-import { ConversationsPage } from "@web/lib/tanstack/options/conversation/conversation";
+import {
+  ConversationsPage,
+  getConversationById
+} from "@web/lib/tanstack/options/conversation/conversation";
 import { addMessageToCache } from "@web/lib/tanstack/query-cache/add-message-to-cache";
 import { uploadFile } from "@web/lib/s3/upload";
+import { EmojiPicker } from "@web/components/chat/emoji-picker";
+import { updateConversation } from "@web/lib/tanstack/query-cache/update-conversation";
+import { updateConversationPreview } from "@web/lib/tanstack/query-cache/update-conversation-preview";
 
 interface ChatInputProps {
   conversationId: string;
@@ -82,39 +88,23 @@ export const ChatInput = React.memo(({ conversationId }: ChatInputProps) => {
 
       addMessageToCache({ queryClient, conversationId, message: optimisticMessage });
 
-      queryClient.setQueryData<InfiniteData<ConversationsPage>>(["conversations"], (old) => {
-        if (!old) return old;
-
-        return {
-          ...old,
-          pages: old.pages.map((page, i) => {
-            if (!page) return page;
-
-            const updated = page.data.find((c) => c.id === conversationId);
-            if (!updated) return page;
-
-            const others = page.data.filter((c) => c.id !== conversationId);
-            const updatedConversation = {
-              ...updated,
-              lastMessage: {
-                id: "",
-                senderId: optimisticMessage.senderId,
-                content: optimisticMessage.type === "image" ? "You sent an image" : trimmed,
-                type: optimisticMessage.type,
-                timestamp: optimisticMessage.timestamp
-              },
-              sortTimestamp: optimisticMessage.timestamp
-            };
-
-            return {
-              ...page,
-              data: [updatedConversation, ...others]
-            };
-          })
-        };
+      await updateConversationPreview({
+        queryClient,
+        conversationId,
+        buildPreview: (old) => ({
+          lastMessage: {
+            id: "",
+            senderId: me.id,
+            senderName: me.fullname,
+            content: selectedFile ? "You sent a photo" : trimmed,
+            type: selectedFile ? "image" : "text",
+            timestamp: new Date()
+          },
+          sortTimestamp: new Date()
+        }),
+        fetchConversation: getConversationById
       });
 
-      // 3️⃣ Emit message
       if (!socket) {
         console.warn("Socket disconnected — message not sent");
         return;
@@ -122,7 +112,7 @@ export const ChatInput = React.memo(({ conversationId }: ChatInputProps) => {
 
       socket.emit(
         "conversation:message:create",
-        optimisticMessage,
+        { ...optimisticMessage },
         (callbackMessage: CallbackMessage) => {
           queryClient.setQueryData<InfiniteData<MessagesPage>>(
             ["messages", conversationId],
@@ -164,6 +154,10 @@ export const ChatInput = React.memo(({ conversationId }: ChatInputProps) => {
     },
     [clearFileInput]
   );
+
+  const handleEmojiSelect = (emoji: string) => {
+    setMessage((prev) => prev + emoji);
+  };
 
   // 🚀 Submit handler
   const handleSubmit = useCallback(
@@ -207,7 +201,7 @@ export const ChatInput = React.memo(({ conversationId }: ChatInputProps) => {
           type="button"
           variant="ghost"
           size="icon"
-          className="TEXT-muted-foreground hover:text-foreground mr-2"
+          className="text-muted-foreground hover:text-foreground mr-2"
           onClick={() => fileInputRef.current?.click()}
         >
           <Paperclip className="h-5 w-5" />
@@ -216,19 +210,29 @@ export const ChatInput = React.memo(({ conversationId }: ChatInputProps) => {
           <Input
             id="message-input"
             placeholder="Type your message..."
-            className="mr-2 flex-grow"
+            className="mr-2 grow"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            disabled={!!imagePreview}
             type="text"
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage(message);
+              }
+            }}
+            readOnly={!!imagePreview}
           />
-          <Button type="submit" size="icon" disabled={!message.trim() && !selectedFile}>
-            <Send className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <EmojiPicker onSelect={handleEmojiSelect} className="bg-background border-none" />
+
+            <Button type="submit" size="icon" disabled={!message.trim() && !selectedFile}>
+              <Send className="h-5 w-5" />
+            </Button>
+          </div>
         </form>
       </div>
     </div>
