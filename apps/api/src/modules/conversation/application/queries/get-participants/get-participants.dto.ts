@@ -6,7 +6,8 @@ export const participantDTOSchema = z.object({
   fullname: z.string(),
   avatar: z.string().nullable(),
   lastReadMessageId: z.uuid().nullable(),
-  typing: z.boolean().optional().default(false)
+  typing: z.boolean().optional().default(false),
+  role: z.string()
 });
 
 export type ParticipantDTO = z.infer<typeof participantDTOSchema>;

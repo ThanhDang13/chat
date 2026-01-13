@@ -29,7 +29,8 @@ export class GetParticipantsQueryHandler implements QueryHandler<
         userId: users.id,
         fullname: users.fullname,
         avatar: users.avatar,
-        lastReadMessageId: conversationParticipants.lastReadMessageId
+        lastReadMessageId: conversationParticipants.lastReadMessageId,
+        role: conversationParticipants.role
       })
       .from(conversationParticipants)
       .innerJoin(users, eq(conversationParticipants.userId, users.id))
