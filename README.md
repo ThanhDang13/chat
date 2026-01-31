@@ -2,7 +2,36 @@
 
 A scalable, event-driven chat system built with **TypeScript**, **Clean Architecture**, and **CQRS**.
 
-This project demonstrates a production-style backend with real-time communication, strict domain boundaries, and horizontal scalability.
+This project demonstrates a production-grade backend with real-time communication, strict domain boundaries, and horizontal scalability.  
+The **UI and core features are inspired by modern messaging platforms such as Facebook Messenger**, including real-time message delivery, conversations, typing indicators, and presence.
+
+The system is designed to handle high concurrency, ensure message consistency, and support future extensions such as read receipts, reactions, and media messaging.
+
+## Preview
+
+### Home
+
+| Light                                        | Dark                                       |
+| -------------------------------------------- | ------------------------------------------ |
+| ![Home Light](<docs/images/home(light).png>) | ![Home Dark](<docs/images/home(dark).png>) |
+
+### Chat
+
+| Light                                        | Dark                                       |
+| -------------------------------------------- | ------------------------------------------ |
+| ![Chat Light](<docs/images/chat(light).png>) | ![Chat Dark](<docs/images/chat(dark).png>) |
+
+### Chat Details
+
+| Dark                                                       |
+| ---------------------------------------------------------- |
+| ![Chat Details Dark](<docs/images/chat-details(dark).png>) |
+
+### Profile
+
+| Light                                              | Dark                                             |
+| -------------------------------------------------- | ------------------------------------------------ |
+| ![Profile Light](<docs/images/profile(light).png>) | ![Profile Dark](<docs/images/profile(dark).png>) |
 
 ---
 
