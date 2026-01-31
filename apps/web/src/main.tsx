@@ -28,7 +28,7 @@ if (!rootElement.innerHTML) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
+        {/* <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" /> */}
       </QueryClientProvider>
     </StrictMode>
   );
